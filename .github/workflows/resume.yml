@@ -1,0 +1,47 @@
+name: Update Resume PDF
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [resume-updated]
+
+jobs:
+  update-resume:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout portfolio
+        uses: actions/checkout@v4
+
+      - name: Download private resume
+        env:
+          GH_TOKEN: ${{ secrets.RESUME_TOKEN }}
+        run: |
+          gh api \
+            -H "Accept: application/vnd.github+json" \
+            /repos/cloemateo/resume/contents/resume.docx \
+            --jq '.content' | base64 --decode > resume.docx
+
+      - name: Install LibreOffice
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+
+      - name: Convert Word to PDF
+        run: |
+          libreoffice --headless --convert-to pdf --outdir . resume.docx
+
+      - name: Remove Word file
+        run: |
+          rm resume.docx
+
+      - name: Commit updated PDF
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add resume.pdf
+          git diff --cached --quiet || git commit -m "Update resume PDF"
+          git push
